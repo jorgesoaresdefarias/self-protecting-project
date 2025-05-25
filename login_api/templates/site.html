@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Login com CAPTCHA</title>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+</head>
+<body>
+  <form id="loginForm">
+    <input type="text" id="username" placeholder="Usuário"><br>
+    <input type="password" id="password" placeholder="Senha"><br>
+
+    <!-- Coloque o CAPTCHA DENTRO da div que será escondida -->
+    <div id="captcha-container" style="display:none;">
+      <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div><br>
+    </div>
+
+    <button type="submit">Login</button>
+  </form>
+
+  <script>
+    document.getElementById("loginForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const captchaContainer = document.getElementById("captcha-container");
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      // só pega token se captcha estiver visível
+      const captchaToken = (captchaContainer.style.display === "block") 
+        ? grecaptcha.getResponse() 
+        : "";
+
+      const res = await fetch("http://127.0.0.1:5000/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          password,
+          captcha_token: captchaToken
+        })
+      });
+
+      const data = await res.json();
+      alert(data.message);
+
+      if (data.show_captcha) {
+        captchaContainer.style.display = "block";
+        grecaptcha.reset(); // limpa o token
+      } else {
+        captchaContainer.style.display = "none";
+      }
+    });
+  </script>
+</body>
+</html>

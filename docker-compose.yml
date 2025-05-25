@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  login_api:
+    build: ./login_api
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    environment:
+      - RECAPTCHA_SECRET=YOUR_RECAPTCHA_SECRET
+    depends_on:
+      - mape_manager
+
+  mape_manager:
+    build: ./mape_manager
+    ports:
+      - "5001:5001"
