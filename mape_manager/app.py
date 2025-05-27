@@ -28,6 +28,7 @@ def monitor():
     return jsonify({"status": "ok"})
 
 @app.route("/evaluate", methods=["POST"])
+@app.route("/evaluate", methods=["POST"])
 def analyze_and_plan():
     data = request.json
     ip = data.get("ip")
@@ -37,23 +38,23 @@ def analyze_and_plan():
         del blocked_ips[ip]
 
     if ip in blocked_ips:
-        return jsonify({"action": "block"})
+        return jsonify({"action": "block", "debug": "IP is currently blocked", "num_attempts": len(attempts_by_ip[ip])})
 
     recent_attempts = [t for t in attempts_by_ip[ip] if (now - t).total_seconds() <= WINDOW_SECONDS]
     attempts_by_ip[ip] = recent_attempts
     num_attempts = len(recent_attempts)
 
-    if num_attempts >= 6:
-        state_by_ip[ip]["2fa"] = True
-        return jsonify({"action": "2fa"})
-    elif num_attempts >= 7:
+    if num_attempts >= 7:
         blocked_ips[ip] = now + timedelta(seconds=BLOCK_TIME_SECONDS)
-        return jsonify({"action": "block"})
+        return jsonify({"action": "block", "debug": "Blocked due to too many attempts", "num_attempts": num_attempts})
+    elif num_attempts >= 6:
+        state_by_ip[ip]["2fa"] = True
+        return jsonify({"action": "2fa", "debug": "2FA required", "num_attempts": num_attempts})
     elif num_attempts >= 3:
         state_by_ip[ip]["captcha"] = True
-        return jsonify({"action": "captcha", "show_captcha": True})
+        return jsonify({"action": "captcha", "show_captcha": True, "debug": "Captcha triggered", "num_attempts": num_attempts})
     else:
-        return jsonify({"action": "allow", "show_captcha": False})
+        return jsonify({"action": "allow", "show_captcha": False, "debug": "Access allowed", "num_attempts": num_attempts})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5001)
