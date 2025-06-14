@@ -1,55 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-  <title>Login com CAPTCHA</title>
-  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <meta charset="UTF-8">
+    <title>Login Adaptativo</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 400px; margin: auto; padding-top: 50px; }
+        .hidden { display: none; }
+    </style>
 </head>
 <body>
-  <form id="loginForm">
-    <input type="text" id="username" placeholder="Usuário"><br>
-    <input type="password" id="password" placeholder="Senha"><br>
+    <h2>Login</h2>
+    <form id="login-form">
+        <label>Usuário:</label><br>
+        <input type="text" id="username"><br><br>
 
-    <!-- Coloque o CAPTCHA DENTRO da div que será escondida -->
-    <div id="captcha-container" style="display:none;">
-      <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div><br>
-    </div>
+        <label>Senha:</label><br>
+        <input type="password" id="password"><br><br>
 
-    <button type="submit">Login</button>
-  </form>
+        <div id="captcha-container" class="hidden">
+            <label>CAPTCHA:</label><br>
+            <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div><br>
+        </div>
 
-  <script>
-    document.getElementById("loginForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
+        <div id="2fa-container" class="hidden">
+            <label>Código 2FA:</label><br>
+            <input type="text" id="2fa_code"><br><br>
+        </div>
 
-      const captchaContainer = document.getElementById("captcha-container");
-      const username = document.getElementById("username").value;
-      const password = document.getElementById("password").value;
+        <button type="submit">Entrar</button>
+    </form>
 
-      // só pega token se captcha estiver visível
-      const captchaToken = (captchaContainer.style.display === "block") 
-        ? grecaptcha.getResponse() 
-        : "";
+    <p id="response-message" style="color: red;"></p>
 
-      const res = await fetch("http://127.0.0.1:5000/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          password,
-          captcha_token: captchaToken
-        })
+    <script src="https://www.google.com/recaptcha/api.js"></script>
+    <script>
+        const form = document.getElementById("login-form");
+        const msg = document.getElementById("response-message");
+        const captchaContainer = document.getElementById("captcha-container");
+        const faContainer = document.getElementById("2fa-container");
+
+       form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const username = document.getElementById("username").value;
+          const password = document.getElementById("password").value;
+          const captchaToken = grecaptcha.getResponse();
+          const twofa = document.getElementById("2fa_code").value;
+
+          const payload = {
+              username: username,
+              password: password
+          };
+
+          if (!captchaContainer.classList.contains("hidden")) {
+              payload["captcha_token"] = captchaToken;
+          }
+
+          if (!faContainer.classList.contains("hidden")) {
+              payload["2fa_code"] = twofa;
+          }
+
+          const response = await fetch("/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+          });
+
+          const result = await response.json();
+
+          msg.textContent = result.message || "Erro desconhecido.";
+
+          // Lógica de exibição condicional
+          if (result.show_captcha) {
+              captchaContainer.classList.remove("hidden");
+          } else {
+              captchaContainer.classList.add("hidden");
+          }
+
+          if (result.require_2fa_code) {
+              faContainer.classList.remove("hidden");
+          } else {
+              faContainer.classList.add("hidden");
+          }
+
+          // Reset CAPTCHA se falhou e não foi para o 2FA
+          if (!response.ok && !result.require_2fa_code) {
+              grecaptcha.reset();
+          }
+
+          if (response.ok) {
+              msg.style.color = "green";
+          } else {
+              msg.style.color = "red";
+          }
       });
-
-      const data = await res.json();
-      alert(data.message);
-
-      if (data.show_captcha) {
-        captchaContainer.style.display = "block";
-        grecaptcha.reset(); // limpa o token
-      } else {
-        captchaContainer.style.display = "none";
-      }
-    });
-  </script>
+    </script>
 </body>
 </html>
